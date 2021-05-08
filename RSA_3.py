@@ -1,51 +1,59 @@
 import rsa
 import hashlib
 from Crypto.Cipher import AES
+from Crypto.Random import get_random_bytes
+from Crypto.Util.Padding import pad, unpad
 import os , base64
+import time
 
-def AES_encrypt(msg , secret_key , padding_character):
+def AES_encrypt(msg , secret_key):
 
-    cypher = AES.new(secret_key)
+    iv = get_random_bytes(AES.block_size)
+    cypher = AES.new(secret_key , AES.MODE_CBC , iv)
     # pad the private_msg
     # because AES encryption requires the length of the msg to be a multiple of 16
-    padded_msg = msg + (padding_character * ((16 - len(msg)) % 16))
+    padded_msg = pad(msg , AES.block_size)
     encrypted_msg = cypher.encrypt(padded_msg)
-    return encrypted_msg
+    return iv + encrypted_msg
 
 
-def AES_decrypt(encrypted_msg , secret_key , padding_character):
+def AES_decrypt(encrypted_msg , secret_key):
 
-    cypher = AES.new(secret_key)
-    decrypted_msg = cypher.decrypt(encrypted_msg)
-    unpadded_msg = decrypted_msg.rstrip(padding_character)
+    cypher = AES.new(secret_key, AES.MODE_CBC , encrypted_msg[:AES.block_size])
+    decrypted_msg = cypher.decrypt(encrypted_msg[AES.block_size:])
+    unpadded_msg = unpad(decrypted_msg, AES.block_size)
     return unpadded_msg
 
 
 def function_3(pubkey , privkey):
+    print("Q3)-------------------------")
     f = open("message.txt", "r")
     message = f.read()
     # message = message.encode('utf8')
     encoded_m = message.encode()
-    hashed_m = hashlib.sha256(encoded_m)
-    digest_m = hashed_m.hexdigest()
-    print("Hex Digest: ", digest_m)
+    #hashed_m = hashlib.sha256(encoded_m)
+    #digest_m = hashed_m.hexdigest()
+    #print("Hex Digest: ", digest_m)
 
-    digest_m = digest_m.encode()
-    cypher_text = rsa.encrypt(digest_m, pubkey)
-    print(cypher_text)
+
+    digest_m = rsa.compute_hash(encoded_m , 'SHA-256')
+    print("HEX Digest: " ,digest_m)
+    #digest_m = digest_m.encode()
+    signature = rsa.sign_hash(digest_m , privkey , 'SHA-256')
 
     print("------------------------------------")
-    print("Digital Signature : ", cypher_text)
-    digest_m = rsa.decrypt(cypher_text, privkey)
-    digest_m = digest_m.decode()
+    print("Digital Signature : ", signature)
+    rsa.verify(encoded_m, signature , pubkey)
+    #digest_m = digest_m.decode()
     print("Message: ", message)
     print("Hex Digest: ", digest_m)
 
 
 def function_2(pubkey , privkey):
+    print("Q2)-------------------------")
     AES_key1_lenght = 16
     AES_key2_lenght = 32
-    padding_character = "{"
+
 
     key_1 = os.urandom(AES_key1_lenght)
     key_2 = os.urandom(AES_key2_lenght)
@@ -68,6 +76,35 @@ def function_2(pubkey , privkey):
     print("Decrypted Key 1:",decrypted_text_1)
     print("Decrypted Key 2:", decrypted_text_2)
 
+    return key_1 , key_2
+
+
+def function_4(key_1 , key_2):
+    print("Q4)-------------------------")
+    f = open("wallhaven-760704.jpg" , "rb")
+    img = f.read()
+    f.close()
+
+    img = bytearray(img)
+
+    #To measure time that encryption takes
+    start_timer = time.perf_counter()
+    ciphertext = AES_encrypt(img , key_1)
+    end_timer = time.perf_counter()
+    total_enc_time = end_timer - start_timer
+    print("Time taken for encryption: " , total_enc_time)
+
+    f = open("encrypted_img.jpg" , "wb")
+    f.write(ciphertext)
+    f.close()
+
+    plaintext = AES_decrypt(ciphertext , key_1)
+
+    f = open("decrypted_img.jpg", "wb")
+    f.write(ciphertext)
+    f.close()
+
+
 
 
 
@@ -75,5 +112,6 @@ def function_2(pubkey , privkey):
 
 print(pubkey)
 print(privkey)
-#function_3(pubkey , privkey)
-function_2(pubkey , privkey)
+function_3(pubkey , privkey)
+(AES_key1_128 , AES_key2_256) = function_2(pubkey , privkey)
+function_4(AES_key1_128,AES_key2_256)
